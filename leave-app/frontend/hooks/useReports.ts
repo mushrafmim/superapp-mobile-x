@@ -26,8 +26,8 @@ export const calculateStats = (leaves: Leave[]) => {
   };
 
   return leaves.reduce((acc, leave) => {
-    const start = new Date(leave.startDate);
-    const end = new Date(leave.endDate);
+    const start = new Date(`${leave.startDate}T00:00:00`);
+    const end = new Date(`${leave.endDate}T00:00:00`);
     const days =
       Math.ceil(
         Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
@@ -76,8 +76,8 @@ export const calculateStats = (leaves: Leave[]) => {
 export const generateCSV = (leaves: Leave[]) => {
   const headers = ["Email", "Type", "Start", "End", "Status", "Days", "Reason"];
   const rows = leaves.map((l) => {
-    const start = new Date(l.startDate);
-    const end = new Date(l.endDate);
+    const start = new Date(`${l.startDate}T00:00:00`);
+    const end = new Date(`${l.endDate}T00:00:00`);
     const days =
       Math.ceil(
         Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
@@ -205,7 +205,7 @@ export const useReports = (params: {
         l.endDate,
         l.status,
         Math.ceil(
-          (new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) /
+          (new Date(`${l.endDate}T00:00:00`).getTime() - new Date(`${l.startDate}T00:00:00`).getTime()) /
             (1000 * 60 * 60 * 24) +
             1
         ),

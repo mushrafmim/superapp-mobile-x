@@ -1,11 +1,14 @@
-import { Leave, UserInfo, Allowances } from "../types";
+import { Leave, UserInfo, Allowances, Holiday, CreateLeaveRequest, UpdateLeaveRequest } from "../types";
 
 // Read the API base URL from environment (Vite provides import.meta.env for client code).
 // Use a sensible fallback for local dev when using the Vite dev proxy.
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || "/api";
 
 class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
     this.name = "ApiError";
   }
@@ -14,11 +17,11 @@ class ApiError extends Error {
 async function request<T>(
   endpoint: string,
   token: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   // Validate token before making request
-  if (!token || token.trim() === '') {
-    throw new ApiError(401, 'Authentication token is required');
+  if (!token || token.trim() === "") {
+    throw new ApiError(401, "Authentication token is required");
   }
 
   const headers = {
@@ -68,7 +71,7 @@ export const api = {
 
   updateGlobalAllowances: async (
     token: string,
-    allowances: Allowances
+    allowances: Allowances,
   ): Promise<void> => {
     return request<void>("/admin/allowances", token, {
       method: "PUT",
@@ -79,7 +82,7 @@ export const api = {
   updateUserRole: async (
     token: string,
     userId: string,
-    role: "admin" | "user"
+    role: "admin" | "user",
   ): Promise<UserInfo> => {
     return request<UserInfo>(`/users/${userId}/role`, token, {
       method: "PUT",
@@ -93,7 +96,7 @@ export const api = {
 
   createLeave: async (
     token: string,
-    data: Omit<Leave, "id" | "status" | "createdAt" | "userId" | "userEmail">
+    data: CreateLeaveRequest,
   ): Promise<Leave> => {
     return request<Leave>("/leaves", token, {
       method: "POST",
@@ -101,10 +104,14 @@ export const api = {
     });
   },
 
+  getLeaveById: async (token: string, id: string): Promise<Leave> => {
+    return request<Leave>(`/leaves/${id}`, token);
+  },
+
   updateLeave: async (
     token: string,
     id: string,
-    data: Partial<Leave>
+    data: UpdateLeaveRequest,
   ): Promise<Leave> => {
     return request<Leave>(`/leaves/${id}`, token, {
       method: "PUT",
@@ -121,22 +128,26 @@ export const api = {
   approveLeave: async (
     token: string,
     id: string,
-    comment?: string
+    comment?: string,
   ): Promise<Leave> => {
-    return request<Leave>(`/leaves/${id}/approve`, token, {
-      method: "POST",
-      body: JSON.stringify({ comment }),
+    return request<Leave>(`/leaves/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({ status: "approved", comment }),
     });
   },
 
   rejectLeave: async (
     token: string,
     id: string,
-    comment?: string
+    comment?: string,
   ): Promise<Leave> => {
-    return request<Leave>(`/leaves/${id}/reject`, token, {
-      method: "POST",
-      body: JSON.stringify({ comment }),
+    return request<Leave>(`/leaves/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({ status: "rejected", comment }),
     });
+  },
+
+  getHolidays: async (token: string): Promise<Holiday[]> => {
+    return request<Holiday[]>("/holidays", token);
   },
 };

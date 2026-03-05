@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Leave, LeaveType, LeaveStatus, UserInfo } from "../types";
+import { Leave, LeaveType, LeaveStatus, UserInfo, CreateLeaveRequest } from "../types";
 import { api } from "../api/client";
 import { formatDuration } from "../utils/formatters";
 
@@ -13,6 +13,7 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
   const [rawLeaves, setRawLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [holidays, setHolidays] = useState<string[]>([]);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -34,9 +35,22 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
     }
   }, [token]);
 
+  const fetchHolidays = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const data = await api.getHolidays(token);
+      const holidayDates = data.map((h) => h.date);
+      setHolidays(holidayDates);
+    } catch (e) {
+      console.error("Failed to fetch holidays", e);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchLeaves();
-  }, [fetchLeaves, refreshKey]);
+    fetchHolidays();
+  }, [fetchLeaves, fetchHolidays, refreshKey]);
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
@@ -46,13 +60,13 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
     const myActiveLeaves = rawLeaves.filter(
       (l) =>
         l.userId === user.id &&
-        (l.status === "approved" || l.status === "pending")
+        (l.status === "approved" || l.status === "pending"),
     );
 
     const used = { sick: 0, annual: 0, casual: 0 };
 
     myActiveLeaves.forEach((l) => {
-      const days = formatDuration(l.startDate, l.endDate);
+      const days = l.totalLeaveDays;
       if (used[l.type] !== undefined) {
         used[l.type] += days;
       }
@@ -63,9 +77,9 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
       annual: Math.max(0, user.allowances.annual - used.annual),
       casual: Math.max(0, user.allowances.casual - used.casual),
       total: user.allowances,
-      used: used,
+      used,
     };
-  }, [rawLeaves, user]);
+  }, [rawLeaves, user, holidays]);
 
   const leaves = useMemo(() => {
     let data = rawLeaves;
@@ -96,7 +110,7 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
 
     return data.sort(
       (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [
     rawLeaves,
@@ -128,31 +142,25 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
     refresh();
   };
 
-  const createLeave = async (data: {
-    type: LeaveType;
-    startDate: string;
-    endDate: string;
-    reason: string;
-  }) => {
+  const createLeave = async (data: CreateLeaveRequest) => {
     if (!token) return;
 
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
+    const start = new Date(`${data.startDate.split("T")[0].split(" ")[0]}T00:00:00`);
+    const end = new Date(`${data.endDate.split("T")[0].split(" ")[0]}T00:00:00`);
 
     if (start > end) {
       throw new Error("Start date cannot be after end date");
     }
 
-    const days =
-      Math.ceil(
-        Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
+    const days = data.isHalfDay
+      ? 0.5
+      : formatDuration(data.startDate, data.endDate, holidays);
 
     const remaining = balances[data.type];
 
     if (days > remaining) {
       throw new Error(
-        `Insufficient ${data.type} leave balance. You have ${remaining} days left.`
+        `Insufficient ${data.type} leave balance. You have ${remaining} days left.`,
       );
     }
 
@@ -163,6 +171,7 @@ export const useLeaves = ({ token, isAdmin, user }: UseLeavesProps) => {
   return {
     leaves,
     rawLeaves,
+    holidays,
     balances,
     loading,
     refresh,
