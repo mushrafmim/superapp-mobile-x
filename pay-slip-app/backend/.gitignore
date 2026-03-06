@@ -1,0 +1,5 @@
+.env
+uploads/
+*.exe
+*.test
+service-account.json
