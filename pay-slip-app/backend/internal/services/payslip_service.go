@@ -28,15 +28,15 @@ func (s *PaySlipService) InsertPaySlip(ps *models.PaySlip) error {
 	if ps.UpdatedAt.IsZero() {
 		ps.UpdatedAt = now
 	}
-	query := `INSERT INTO pay_slips (id, user_id, user_email, month, year, file_url, uploaded_by, created_at, updated_at) 
+	query := `INSERT INTO pay_slips (id, user_id, user_email, month, year, file_path, uploaded_by, created_at, updated_at) 
 	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.Exec(query, ps.ID, ps.UserID, ps.UserEmail, ps.Month, ps.Year, ps.FileURL, ps.UploadedBy, ps.CreatedAt, ps.UpdatedAt)
+	_, err := s.db.Exec(query, ps.ID, ps.UserID, ps.UserEmail, ps.Month, ps.Year, ps.FilePath, ps.UploadedBy, ps.CreatedAt, ps.UpdatedAt)
 	return err
 }
 
-func (s *PaySlipService) UpdatePaySlipFile(id, fileURL, uploadedBy string) error {
-	query := "UPDATE pay_slips SET file_url = ?, uploaded_by = ?, updated_at = ? WHERE id = ?"
-	_, err := s.db.Exec(query, fileURL, uploadedBy, time.Now(), id)
+func (s *PaySlipService) UpdatePaySlipFile(id, filePath, uploadedBy string) error {
+	query := "UPDATE pay_slips SET file_path = ?, uploaded_by = ?, updated_at = ? WHERE id = ?"
+	_, err := s.db.Exec(query, filePath, uploadedBy, time.Now(), id)
 	return err
 }
 
@@ -47,8 +47,8 @@ func (s *PaySlipService) DeletePaySlip(id string) error {
 
 func (s *PaySlipService) GetPaySlipByID(id string) (*models.PaySlip, error) {
 	ps := &models.PaySlip{}
-	query := "SELECT id, user_id, user_email, month, year, file_url, uploaded_by, created_at, updated_at FROM pay_slips WHERE id = ?"
-	err := s.db.QueryRow(query, id).Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.FileURL, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt)
+	query := "SELECT id, user_id, user_email, month, year, file_path, uploaded_by, created_at, updated_at FROM pay_slips WHERE id = ?"
+	err := s.db.QueryRow(query, id).Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.FilePath, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (s *PaySlipService) GetPaySlipByID(id string) (*models.PaySlip, error) {
 
 func (s *PaySlipService) GetPaySlipByUserMonthYear(userID string, month, year int) (*models.PaySlip, error) {
 	ps := &models.PaySlip{}
-	query := "SELECT id, user_id, user_email, month, year, file_url, uploaded_by, created_at, updated_at FROM pay_slips WHERE user_id = ? AND month = ? AND year = ?"
-	err := s.db.QueryRow(query, userID, month, year).Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.FileURL, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt)
+	query := "SELECT id, user_id, user_email, month, year, file_path, uploaded_by, created_at, updated_at FROM pay_slips WHERE user_id = ? AND month = ? AND year = ?"
+	err := s.db.QueryRow(query, userID, month, year).Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.FilePath, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -95,7 +95,7 @@ func (s *PaySlipService) fetchPaySlips(whereClause string, args []interface{}, l
 	}
 
 	// 2. Fetch Paginated Data
-	baseQuery := "SELECT id, user_id, user_email, month, year, file_url, uploaded_by, created_at, updated_at FROM pay_slips"
+	baseQuery := "SELECT id, user_id, user_email, month, year, uploaded_by, created_at, updated_at FROM pay_slips"
 
 	if afterCreatedAt != nil && afterID != "" {
 		if whereClause != "" {
@@ -131,7 +131,7 @@ func (s *PaySlipService) fetchPaySlips(whereClause string, args []interface{}, l
 	slips := make([]models.PaySlip, 0)
 	for rows.Next() {
 		var ps models.PaySlip
-		if err := rows.Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.FileURL, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt); err != nil {
+		if err := rows.Scan(&ps.ID, &ps.UserID, &ps.UserEmail, &ps.Month, &ps.Year, &ps.UploadedBy, &ps.CreatedAt, &ps.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		slips = append(slips, ps)

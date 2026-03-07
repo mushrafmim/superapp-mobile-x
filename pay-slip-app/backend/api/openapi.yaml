@@ -14,8 +14,8 @@ info:
 
     **Two-Step Upload**:
     1. Admin calls `POST /api/upload` with a file (`multipart/form-data`).
-    2. Backend uploads to Firebase Storage and returns `fileUrl`.
-    3. Admin calls `POST /api/pay-slips` with JSON metadata and the `fileUrl`.
+    2. Backend uploads to Firebase Storage and returns `filePath`.
+    3. Admin calls `POST /api/pay-slips` with JSON metadata and the `filePath`.
   version: "3.0.0"
 
 servers:
@@ -72,10 +72,12 @@ components:
           maximum: 12
         year:
           type: integer
+        filePath:
+          type: string
+          description: The clean storage path for the file. Included in creation and listing responses. Omitted in single-fetch responses.
         fileUrl:
           type: string
-          format: uri
-          description: Temporary V4 Signed URL for Firebase Storage (typically valid for 1 hour)
+          description: A temporary V4 Signed URL for accessing the file. Included only in single-fetch responses.
         uploadedBy:
           type: string
         createdAt:
@@ -100,7 +102,7 @@ components:
 
     CreatePaySlipRequest:
       type: object
-      required: [userId, month, year, fileUrl]
+      required: [userId, month, year, filePath]
       properties:
         userId:
           type: string
@@ -111,10 +113,9 @@ components:
           maximum: 12
         year:
           type: integer
-        fileUrl:
+        filePath:
           type: string
-          format: uri
-          description: Signed URL returned by /api/upload
+          description: Clean storage path returned by /api/upload (e.g., pay-slips/abc-123.pdf)
 
     UpdateUserRoleRequest:
       type: object
@@ -127,9 +128,8 @@ components:
     UploadResponse:
       type: object
       properties:
-        fileUrl:
+        filePath:
           type: string
-          format: uri
 
     ErrorResponse:
       type: object
@@ -251,7 +251,7 @@ paths:
       tags: [PaySlips]
       summary: Upload a pay slip file [admin only]
       description: |
-        Accepts a file and uploads it to Firebase Storage. Returns the URL to be used in `/api/pay-slips`.
+        Accepts a file and uploads it to Firebase Storage. Returns the storage path to be used in `/api/pay-slips`.
       requestBody:
         required: true
         content:

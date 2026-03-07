@@ -37,13 +37,13 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	ctx := r.Context()
-	url, err := h.Storage.UploadFile(ctx, file, header.Filename)
+	path, err := h.Storage.UploadFile(ctx, file, header.Filename)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to upload to storage: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	jsonResponse(w, http.StatusOK, map[string]string{"fileUrl": url})
+	jsonResponse(w, http.StatusOK, map[string]string{"filePath": path})
 }
 
 // CreatePaySlip handles POST /api/pay-slips  [admin only]
@@ -84,11 +84,8 @@ func (h *Handler) CreatePaySlip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract the clean path
-	cleanPath := h.Storage.ExtractPathFromURL(req.FileURL)
-
 	if existing != nil {
-		if err := h.PaySlipService.UpdatePaySlipFile(existing.ID, cleanPath, currentUser.ID); err != nil {
+		if err := h.PaySlipService.UpdatePaySlipFile(existing.ID, req.FilePath, currentUser.ID); err != nil {
 			http.Error(w, "Failed to update pay slip", http.StatusInternalServerError)
 			return
 		}
@@ -96,11 +93,6 @@ func (h *Handler) CreatePaySlip(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Failed to retrieve updated pay slip", http.StatusInternalServerError)
 			return
-		}
-
-		// Sign the URL before sending back
-		if signed, err := h.Storage.GetSignedURL(updated.FileURL); err == nil {
-			updated.FileURL = signed
 		}
 
 		jsonResponse(w, http.StatusOK, updated)
@@ -112,18 +104,13 @@ func (h *Handler) CreatePaySlip(w http.ResponseWriter, r *http.Request) {
 		UserEmail:  userEmail,
 		Month:      req.Month,
 		Year:       req.Year,
-		FileURL:    cleanPath,
+		FilePath:   req.FilePath,
 		UploadedBy: currentUser.ID,
 		CreatedAt:  time.Now(),
 	}
 	if err := h.PaySlipService.InsertPaySlip(ps); err != nil {
 		http.Error(w, "Failed to save pay slip", http.StatusInternalServerError)
 		return
-	}
-
-	// Sign the URL before sending back to frontend
-	if signed, err := h.Storage.GetSignedURL(ps.FileURL); err == nil {
-		ps.FileURL = signed
 	}
 
 	jsonResponse(w, http.StatusCreated, ps)
@@ -182,22 +169,17 @@ func (h *Handler) GetPaySlips(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Refresh Signed URLs for the response
+	// 2. Return clean paths only for the list (per latest PR review)
 	data := slips
 	if limit > 0 && len(slips) > limit {
 		data = slips[:limit]
 	}
 
-	for i := range data {
-		if signed, err := h.Storage.GetSignedURL(data[i].FileURL); err == nil {
-			data[i].FileURL = signed
-		}
-	}
-
-	var nextCursor string
+	var nextCursor *string
 	if limit > 0 && len(slips) > limit {
 		last := data[limit-1]
-		nextCursor = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s|%s", last.CreatedAt.Format(time.RFC3339), last.ID)))
+		cursor := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s|%s", last.CreatedAt.Format(time.RFC3339), last.ID)))
+		nextCursor = &cursor
 	}
 
 	jsonResponse(w, http.StatusOK, models.PaySlipsResponse{
@@ -226,9 +208,10 @@ func (h *Handler) GetPaySlipByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate fresh signed URL
-	if signed, err := h.Storage.GetSignedURL(ps.FileURL); err == nil {
+	// Generate fresh signed URL for the explicitly requested file
+	if signed, err := h.Storage.GetSignedURL(ps.FilePath); err == nil {
 		ps.FileURL = signed
+		ps.FilePath = "" // No need to return both in single fetch, per latest review
 	}
 
 	jsonResponse(w, http.StatusOK, ps)
