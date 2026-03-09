@@ -4,6 +4,7 @@ package models
 import (
 	"errors"
 	"pay-slip-app/internal/constants"
+	"strings"
 	"time"
 )
 
@@ -23,7 +24,8 @@ type PaySlip struct {
 	UserEmail  string    `json:"userEmail,omitempty"`
 	Month      int       `json:"month"`
 	Year       int       `json:"year"`
-	FileURL    string    `json:"fileUrl"` // Firebase Storage download URL
+	FilePath   string    `json:"filePath,omitempty"` // Firebase Storage clean path. Maps to 'file_path' in DB.
+	SignedURL  string    `json:"signedUrl,omitempty"` // Signed URL for access (provided only in single-fetch)
 	UploadedBy string    `json:"uploadedBy"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
@@ -33,15 +35,15 @@ type PaySlip struct {
 type PaySlipsResponse struct {
 	Data       []PaySlip `json:"data"`
 	Total      int       `json:"total"`
-	NextCursor string    `json:"nextCursor,omitempty"`
+	NextCursor *string   `json:"nextCursor"`
 }
 
 // CreatePaySlipRequest is the JSON body for POST /api/pay-slips.
 type CreatePaySlipRequest struct {
-	UserID  string `json:"userId"`
-	Month   int    `json:"month"`
-	Year    int    `json:"year"`
-	FileURL string `json:"fileUrl"`
+	UserID   string `json:"userId"`
+	Month    int    `json:"month"`
+	Year     int    `json:"year"`
+	FilePath string `json:"filePath"`
 }
 
 func (r *CreatePaySlipRequest) Validate() error {
@@ -54,8 +56,11 @@ func (r *CreatePaySlipRequest) Validate() error {
 	if r.Year < 2000 {
 		return errors.New("year must be 2000 or later")
 	}
-	if r.FileURL == "" {
-		return errors.New("fileUrl is required")
+	if r.FilePath == "" {
+		return errors.New("filePath is required")
+	}
+	if !strings.HasPrefix(r.FilePath, "pay-slips/") {
+		return errors.New("filePath must start with 'pay-slips/'")
 	}
 	return nil
 }
