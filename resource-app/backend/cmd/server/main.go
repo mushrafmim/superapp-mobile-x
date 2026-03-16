@@ -110,8 +110,8 @@ func main() {
 	apiGroup.POST("/bookings/:id/reschedule", api.HandleRescheduleBooking(dbStore))
 	apiGroup.DELETE("/bookings/:id", api.HandleCancelBooking(dbStore))
 
-	// // Stats
-	// apiGroup.GET("/stats", api.HandleGetStats(dbStore))
+	// Stats
+	apiGroup.GET("/stats", api.HandleGetStats(dbStore))
 	// holidays
 	apiGroup.GET("/holidays", api.HandleGetHolidays())
 

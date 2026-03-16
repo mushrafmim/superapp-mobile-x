@@ -120,7 +120,7 @@ type ResourceUsageStats struct {
 func (s *DBStore) GetUtilizationStats() ([]ResourceUsageStats, error) {
 	// This is a simplified implementation. In a real app, you'd likely do this with a complex SQL query.
 	// For now, we'll fetch resources and bookings and calculate in memory to match the mock implementation.
-
+	
 	resourceRepo := resource.NewGormRepository(s.db)
 	resources, err := resourceRepo.GetResources()
 	if err != nil {
