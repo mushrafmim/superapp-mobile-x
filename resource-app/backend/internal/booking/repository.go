@@ -13,8 +13,8 @@ import (
 type Repository interface {
 	GetBookings() ([]Booking, error)
 	CreateBooking(booking *Booking) error
-	UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) error
-	RescheduleBooking(id string, newStart, newEnd time.Time) error
+	UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) (*Booking, error)
+	RescheduleBooking(id string, newStart, newEnd time.Time) (*Booking, error)
 	CancelBooking(id string) error
 }
 
@@ -74,7 +74,7 @@ func (r *GormRepository) CreateBooking(booking *Booking) error {
 }
 
 // UpdateBookingStatus updates the status of a booking with optional rejection reason
-func (r *GormRepository) UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) error {
+func (r *GormRepository) UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) (*Booking, error) {
 	updates := map[string]interface{}{
 		"status": status,
 	}
@@ -83,18 +83,24 @@ func (r *GormRepository) UpdateBookingStatus(id string, status BookingStatus, re
 	}
 	result := r.db.Model(&Booking{}).Where("id = ?", id).Updates(updates)
 	if result.Error != nil {
-		return result.Error
+		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
-		return ErrBookingNotFound
+		return nil, ErrBookingNotFound
 	}
-	return nil
+
+	var booking Booking
+	if err := r.db.First(&booking, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &booking, nil
 }
 
 // RescheduleBooking reschedules a booking to new start and end times
 // Uses transaction to validate the new time slot before rescheduling
-func (r *GormRepository) RescheduleBooking(id string, newStart, newEnd time.Time) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *GormRepository) RescheduleBooking(id string, newStart, newEnd time.Time) (*Booking, error) {
+	var updated Booking
+	if err := r.db.Transaction(func(tx *gorm.DB) error {
 		// Get original booking to check resource ID
 		var booking Booking
 		if err := tx.First(&booking, "id = ?", id).Error; err != nil {
@@ -123,22 +129,30 @@ func (r *GormRepository) RescheduleBooking(id string, newStart, newEnd time.Time
 				newStart,
 			).
 			Count(&count).Error; err != nil {
-			return err
-		}
+				return err
+			}
 
 		if count > 0 {
 			return ErrRescheduleSlotConflict
 		}
 
 		// 3. Update the booking with new times and set status to Proposed
-		return tx.Model(&Booking{}).
+		if err := tx.Model(&Booking{}).
 			Where("id = ?", id).
 			Updates(map[string]interface{}{
 				"start":  newStart,
 				"end":    newEnd,
 				"status": StatusProposed,
-			}).Error
-	})
+			}).Error; err != nil {
+			return err
+		}
+
+		return tx.First(&updated, "id = ?", id).Error
+	}); err != nil {
+		return nil, err
+	}
+
+	return &updated, nil
 }
 
 // CancelBooking cancels a booking by updating its status

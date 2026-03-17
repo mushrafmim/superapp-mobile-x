@@ -34,11 +34,11 @@ func (s *Service) CreateBooking(booking *Booking, userID string, userRole usr.Ro
 	return s.repo.CreateBooking(booking)
 }
 
-func (s *Service) UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) error {
+func (s *Service) UpdateBookingStatus(id string, status BookingStatus, rejectionReason *string) (*Booking, error) {
 	return s.repo.UpdateBookingStatus(id, status, rejectionReason)
 }
 
-func (s *Service) RescheduleBooking(id string, newStart, newEnd time.Time) error {
+func (s *Service) RescheduleBooking(id string, newStart, newEnd time.Time) (*Booking, error) {
 	return s.repo.RescheduleBooking(id, newStart, newEnd)
 }
 
