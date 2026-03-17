@@ -53,6 +53,16 @@ const Bridge = {
                 };
             }
         }
+
+        // Fallback for local development
+        if (import.meta.env?.DEV) {
+            console.warn("Using mock authentication token for local development");
+            return {
+                token: "mock-local-token",
+                email: "dev@example.com",
+            };
+        }
+
         throw new Error("Bridge not available - must be run within the mobile app");
     },
 
